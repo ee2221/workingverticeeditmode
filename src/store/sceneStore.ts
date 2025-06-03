@@ -27,7 +27,7 @@ interface SceneState {
     indices: number[][];
     positions: THREE.Vector3[];
     initialPositions: THREE.Vector3[];
-    originalPositions: Float32Array;
+    connectedVertices: Set<number>;
   } | null;
   addObject: (object: THREE.Object3D, name: string) => void;
   removeObject: (id: string) => void;
@@ -208,20 +208,48 @@ export const useSceneStore = create<SceneState>((set, get) => ({
 
       const geometry = state.selectedObject.geometry;
       const positionAttribute = geometry.attributes.position;
-      
-      // Store original positions for restoration
-      const originalPositions = new Float32Array(positionAttribute.array);
+      const connectedVertices = new Set<number>();
+      const edges: number[][] = [];
+
+      // Find all connected vertices
+      const findConnectedVertices = (startIndex: number) => {
+        if (connectedVertices.has(startIndex)) return;
+        connectedVertices.add(startIndex);
+
+        const startPos = new THREE.Vector3(
+          positionAttribute.getX(startIndex),
+          positionAttribute.getY(startIndex),
+          positionAttribute.getZ(startIndex)
+        );
+
+        for (let i = 0; i < positionAttribute.count; i++) {
+          if (i === startIndex) continue;
+
+          const pos = new THREE.Vector3(
+            positionAttribute.getX(i),
+            positionAttribute.getY(i),
+            positionAttribute.getZ(i)
+          );
+
+          if (pos.distanceTo(startPos) < 0.0001) {
+            edges.push([startIndex, i]);
+            findConnectedVertices(i);
+          }
+        }
+      };
+
+      vertexIndices.forEach(index => findConnectedVertices(index));
 
       return {
         draggedEdge: {
-          indices: [vertexIndices],
+          indices: edges,
           positions: positions,
           initialPositions: positions.map(p => p.clone()),
-          originalPositions
+          connectedVertices
         },
         selectedElements: {
           ...state.selectedElements,
-          edges: vertexIndices
+          edges: Array.from(connectedVertices)
         }
       };
     }),
@@ -232,28 +260,28 @@ export const useSceneStore = create<SceneState>((set, get) => ({
 
       const geometry = state.selectedObject.geometry;
       const positions = geometry.attributes.position;
-      
-      // Reset all vertices to their original positions
-      positions.array.set(state.draggedEdge.originalPositions);
-      
-      // Calculate the movement offset from the initial position
       const offset = position.clone().sub(state.draggedEdge.initialPositions[0]);
-      
-      // Only move the selected edge vertices
-      state.draggedEdge.indices[0].forEach((vertexIndex, i) => {
-        const newPos = state.draggedEdge.initialPositions[i].clone().add(offset);
-        positions.setXYZ(
-          vertexIndex,
-          newPos.x,
-          newPos.y,
-          newPos.z
+
+      // Move all connected vertices together
+      state.draggedEdge.connectedVertices.forEach(vertexIndex => {
+        const currentPos = new THREE.Vector3(
+          positions.getX(vertexIndex),
+          positions.getY(vertexIndex),
+          positions.getZ(vertexIndex)
         );
+        const newPos = currentPos.add(offset);
+        positions.setXYZ(vertexIndex, newPos.x, newPos.y, newPos.z);
       });
 
       positions.needsUpdate = true;
       geometry.computeVertexNormals();
       
-      return state;
+      return {
+        draggedEdge: {
+          ...state.draggedEdge,
+          initialPositions: [position.clone()]
+        }
+      };
     }),
 
   endEdgeDrag: () => set({ draggedEdge: null }),
