@@ -8,30 +8,44 @@ const VertexCoordinates = ({ position, onPositionChange }) => {
   if (!position) return null;
 
   const handleChange = (axis: 'x' | 'y' | 'z', value: string) => {
-    const newPosition = new THREE.Vector3(
-      axis === 'x' ? parseFloat(value) || 0 : position.x,
-      axis === 'y' ? parseFloat(value) || 0 : position.y,
-      axis === 'z' ? parseFloat(value) || 0 : position.z
-    );
+    const newPosition = position.clone();
+    newPosition[axis] = parseFloat(value) || 0;
     onPositionChange(newPosition);
   };
 
   return (
-    <div className="absolute right-4 bottom-4 bg-[#1a1a1a] text-white/90 p-4 rounded-xl shadow-2xl shadow-black/20 border border-white/5">
-      <h3 className="text-sm font-medium mb-3 text-white/70">Vertex Position</h3>
+    <div className="absolute right-4 bottom-4 bg-black/75 text-white p-4 rounded-lg font-mono">
       <div className="space-y-2">
-        {['x', 'y', 'z'].map((axis) => (
-          <div key={axis} className="flex items-center gap-2">
-            <label className="text-xs uppercase text-white/50 w-6">{axis}:</label>
-            <input
-              type="number"
-              value={position[axis].toFixed(3)}
-              onChange={(e) => handleChange(axis, e.target.value)}
-              className="bg-[#2a2a2a] border border-white/10 px-2 py-1 rounded w-24 text-right text-sm focus:outline-none focus:border-blue-500/50"
-              step="0.1"
-            />
-          </div>
-        ))}
+        <div className="flex items-center gap-2">
+          <label className="w-8">X:</label>
+          <input
+            type="number"
+            value={position.x.toFixed(3)}
+            onChange={(e) => handleChange('x', e.target.value)}
+            className="bg-gray-800 px-2 py-1 rounded w-24 text-right"
+            step="0.1"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="w-8">Y:</label>
+          <input
+            type="number"
+            value={position.y.toFixed(3)}
+            onChange={(e) => handleChange('y', e.target.value)}
+            className="bg-gray-800 px-2 py-1 rounded w-24 text-right"
+            step="0.1"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="w-8">Z:</label>
+          <input
+            type="number"
+            value={position.z.toFixed(3)}
+            onChange={(e) => handleChange('z', e.target.value)}
+            className="bg-gray-800 px-2 py-1 rounded w-24 text-right"
+            step="0.1"
+          />
+        </div>
       </div>
     </div>
   );
@@ -75,11 +89,11 @@ const VertexCountSelector = () => {
   }
 
   return (
-    <div className="absolute left-1/2 top-4 -translate-x-1/2 bg-[#1a1a1a] text-white/90 p-4 rounded-xl shadow-2xl shadow-black/20 border border-white/5">
+    <div className="absolute left-1/2 top-4 -translate-x-1/2 bg-black/75 text-white p-4 rounded-lg">
       <div className="flex items-center gap-2">
         <label className="text-sm font-medium">Vertex Count:</label>
         <select
-          className="bg-[#2a2a2a] border border-white/10 px-3 py-1.5 rounded text-sm focus:outline-none focus:border-blue-500/50"
+          className="bg-gray-800 px-3 py-1.5 rounded text-sm"
           onChange={(e) => onChange(parseInt(e.target.value))}
           value={currentVertexCount}
         >
