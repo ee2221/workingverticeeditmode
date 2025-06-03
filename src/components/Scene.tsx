@@ -147,7 +147,7 @@ const VertexPoints = ({ geometry, object }) => {
 };
 
 const EdgeLines = ({ geometry, object }) => {
-  const { editMode, selectedElements, startEdgeDrag } = useSceneStore();
+  const { editMode, selectedElements, startEdgeDrag, draggedEdge } = useSceneStore();
   const positions = geometry.attributes.position;
   const edges = [];
   const worldMatrix = object.matrixWorld;
@@ -222,12 +222,15 @@ const EdgeLines = ({ geometry, object }) => {
       {edges.map(({ vertices: [v1, v2], positions: [p1, p2], midpoint }, i) => {
         const points = [p1, p2];
         const geometry = new THREE.BufferGeometry().setFromPoints(points);
+        const isSelected = draggedEdge?.indices.some(([a, b]) => 
+          (a === v1 && b === v2) || (a === v2 && b === v1)
+        );
         
         return (
           <group key={i}>
             <line geometry={geometry}>
               <lineBasicMaterial
-                color={selectedElements.edges.includes(v1) || selectedElements.edges.includes(v2) ? 'red' : 'yellow'}
+                color={isSelected ? 'red' : 'yellow'}
                 linewidth={2}
               />
             </line>
@@ -240,7 +243,7 @@ const EdgeLines = ({ geometry, object }) => {
             >
               <sphereGeometry args={[0.08]} />
               <meshBasicMaterial
-                color={selectedElements.edges.includes(v1) || selectedElements.edges.includes(v2) ? 'red' : 'yellow'}
+                color={isSelected ? 'red' : 'yellow'}
                 transparent
                 opacity={0.7}
               />
