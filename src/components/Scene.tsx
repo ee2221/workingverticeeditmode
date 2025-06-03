@@ -13,39 +13,30 @@ const VertexCoordinates = ({ position, onPositionChange }) => {
     onPositionChange(newPosition);
   };
 
+  const handleWheel = (e: React.WheelEvent, axis: 'x' | 'y' | 'z') => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+    const newPosition = position.clone();
+    newPosition[axis] = parseFloat((newPosition[axis] + delta).toFixed(3));
+    onPositionChange(newPosition);
+  };
+
   return (
     <div className="absolute right-4 bottom-4 bg-black/75 text-white p-4 rounded-lg font-mono">
       <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <label className="w-8">X:</label>
-          <input
-            type="number"
-            value={position.x.toFixed(3)}
-            onChange={(e) => handleChange('x', e.target.value)}
-            className="bg-gray-800 px-2 py-1 rounded w-24 text-right"
-            step="0.1"
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <label className="w-8">Y:</label>
-          <input
-            type="number"
-            value={position.y.toFixed(3)}
-            onChange={(e) => handleChange('y', e.target.value)}
-            className="bg-gray-800 px-2 py-1 rounded w-24 text-right"
-            step="0.1"
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <label className="w-8">Z:</label>
-          <input
-            type="number"
-            value={position.z.toFixed(3)}
-            onChange={(e) => handleChange('z', e.target.value)}
-            className="bg-gray-800 px-2 py-1 rounded w-24 text-right"
-            step="0.1"
-          />
-        </div>
+        {(['x', 'y', 'z'] as const).map((axis) => (
+          <div key={axis} className="flex items-center gap-2">
+            <label className="w-8">{axis.toUpperCase()}:</label>
+            <input
+              type="number"
+              value={position[axis].toFixed(3)}
+              onChange={(e) => handleChange(axis, e.target.value)}
+              onWheel={(e) => handleWheel(e, axis)}
+              className="bg-gray-800 px-2 py-1 rounded w-24 text-right hover:bg-gray-700 focus:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              step="0.1"
+            />
+          </div>
+        ))}
       </div>
     </div>
   );
