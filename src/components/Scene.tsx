@@ -227,7 +227,7 @@ const EdgeLines = ({ geometry, object }) => {
           <group key={i}>
             <line geometry={geometry}>
               <lineBasicMaterial
-                color={selectedElements.edges.includes(i) ? 'red' : 'yellow'}
+                color={selectedElements.edges.includes(v1) || selectedElements.edges.includes(v2) ? 'red' : 'yellow'}
                 linewidth={2}
               />
             </line>
@@ -240,7 +240,7 @@ const EdgeLines = ({ geometry, object }) => {
             >
               <sphereGeometry args={[0.08]} />
               <meshBasicMaterial
-                color={selectedElements.edges.includes(i) ? 'red' : 'yellow'}
+                color={selectedElements.edges.includes(v1) || selectedElements.edges.includes(v2) ? 'red' : 'yellow'}
                 transparent
                 opacity={0.7}
               />
