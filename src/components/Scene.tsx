@@ -152,26 +152,69 @@ const EdgeLines = ({ geometry, object }) => {
   const edges = [];
   const worldMatrix = object.matrixWorld;
 
-  for (let i = 0; i < positions.count; i += 2) {
-    const v1 = new THREE.Vector3(
-      positions.getX(i),
-      positions.getY(i),
-      positions.getZ(i)
-    ).applyMatrix4(worldMatrix);
+  // Get all edges including vertical ones
+  const indices = geometry.index ? Array.from(geometry.index.array) : null;
+  
+  if (indices) {
+    // For indexed geometry
+    for (let i = 0; i < indices.length; i += 3) {
+      const addEdge = (a: number, b: number) => {
+        const v1 = new THREE.Vector3(
+          positions.getX(indices[a]),
+          positions.getY(indices[a]),
+          positions.getZ(indices[a])
+        ).applyMatrix4(worldMatrix);
 
-    const v2 = new THREE.Vector3(
-      positions.getX(i + 1),
-      positions.getY(i + 1),
-      positions.getZ(i + 1)
-    ).applyMatrix4(worldMatrix);
+        const v2 = new THREE.Vector3(
+          positions.getX(indices[b]),
+          positions.getY(indices[b]),
+          positions.getZ(indices[b])
+        ).applyMatrix4(worldMatrix);
 
-    const midpoint = v1.clone().add(v2).multiplyScalar(0.5);
+        const midpoint = v1.clone().add(v2).multiplyScalar(0.5);
 
-    edges.push({
-      vertices: [i, i + 1],
-      positions: [v1, v2],
-      midpoint
-    });
+        edges.push({
+          vertices: [indices[a], indices[b]],
+          positions: [v1, v2],
+          midpoint
+        });
+      };
+
+      // Add all three edges of the triangle
+      addEdge(i, i + 1);
+      addEdge(i + 1, i + 2);
+      addEdge(i + 2, i);
+    }
+  } else {
+    // For non-indexed geometry
+    for (let i = 0; i < positions.count; i += 3) {
+      const addEdge = (a: number, b: number) => {
+        const v1 = new THREE.Vector3(
+          positions.getX(a),
+          positions.getY(a),
+          positions.getZ(a)
+        ).applyMatrix4(worldMatrix);
+
+        const v2 = new THREE.Vector3(
+          positions.getX(b),
+          positions.getY(b),
+          positions.getZ(b)
+        ).applyMatrix4(worldMatrix);
+
+        const midpoint = v1.clone().add(v2).multiplyScalar(0.5);
+
+        edges.push({
+          vertices: [a, b],
+          positions: [v1, v2],
+          midpoint
+        });
+      };
+
+      // Add all three edges of the triangle
+      addEdge(i, i + 1);
+      addEdge(i + 1, i + 2);
+      addEdge(i + 2, i);
+    }
   }
 
   return editMode === 'edge' ? (
