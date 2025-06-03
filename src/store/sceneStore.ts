@@ -205,15 +205,53 @@ export const useSceneStore = create<SceneState>((set, get) => ({
     set((state) => {
       if (!(state.selectedObject instanceof THREE.Mesh)) return state;
 
+      const geometry = state.selectedObject.geometry;
+      const positionAttribute = geometry.attributes.position;
+      const overlappingEdges = [];
+      const allPositions = [];
+      const initialPositions = [];
+      const processedVertices = new Set();
+
+      // Find all connected edges with matching positions
+      vertexIndices.forEach((vertexIndex) => {
+        const vertexPos = new THREE.Vector3(
+          positionAttribute.getX(vertexIndex),
+          positionAttribute.getY(vertexIndex),
+          positionAttribute.getZ(vertexIndex)
+        );
+
+        for (let i = 0; i < positionAttribute.count - 1; i += 2) {
+          const v1 = new THREE.Vector3(
+            positionAttribute.getX(i),
+            positionAttribute.getY(i),
+            positionAttribute.getZ(i)
+          );
+          const v2 = new THREE.Vector3(
+            positionAttribute.getX(i + 1),
+            positionAttribute.getY(i + 1),
+            positionAttribute.getZ(i + 1)
+          );
+
+          if ((v1.distanceTo(vertexPos) < 0.0001 || v2.distanceTo(vertexPos) < 0.0001) &&
+              !processedVertices.has(i) && !processedVertices.has(i + 1)) {
+            overlappingEdges.push([i, i + 1]);
+            allPositions.push(v1.clone(), v2.clone());
+            initialPositions.push(v1.clone(), v2.clone());
+            processedVertices.add(i);
+            processedVertices.add(i + 1);
+          }
+        }
+      });
+
       return {
         draggedEdge: {
-          indices: [vertexIndices],
-          positions: positions.map(p => p.clone()),
-          initialPositions: positions.map(p => p.clone())
+          indices: overlappingEdges,
+          positions: allPositions,
+          initialPositions: initialPositions
         },
         selectedElements: {
           ...state.selectedElements,
-          edges: vertexIndices
+          edges: Array.from(processedVertices)
         }
       };
     }),
@@ -228,15 +266,18 @@ export const useSceneStore = create<SceneState>((set, get) => ({
       // Calculate the movement offset from the initial position
       const offset = position.clone().sub(state.draggedEdge.initialPositions[0]);
       
-      // Update each vertex position of the edge
-      state.draggedEdge.indices[0].forEach((vertexIndex, i) => {
-        const newPos = state.draggedEdge.initialPositions[i].clone().add(offset);
-        positions.setXYZ(
-          vertexIndex,
-          newPos.x,
-          newPos.y,
-          newPos.z
-        );
+      // Update all vertices of connected edges
+      state.draggedEdge.indices.forEach((edgeIndices, edgeIdx) => {
+        edgeIndices.forEach((vertexIndex, i) => {
+          const baseIndex = edgeIdx * 2 + i;
+          const newPos = state.draggedEdge.initialPositions[baseIndex].clone().add(offset);
+          positions.setXYZ(
+            vertexIndex,
+            newPos.x,
+            newPos.y,
+            newPos.z
+          );
+        });
       });
 
       positions.needsUpdate = true;
