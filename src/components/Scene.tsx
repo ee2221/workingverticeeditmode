@@ -8,8 +8,11 @@ const VertexCoordinates = ({ position, onPositionChange }) => {
   if (!position) return null;
 
   const handleChange = (axis: 'x' | 'y' | 'z', value: string) => {
-    const newPosition = position.clone();
-    newPosition[axis] = parseFloat(value) || 0;
+    const newPosition = new THREE.Vector3(
+      axis === 'x' ? parseFloat(value) || 0 : position.x,
+      axis === 'y' ? parseFloat(value) || 0 : position.y,
+      axis === 'z' ? parseFloat(value) || 0 : position.z
+    );
     onPositionChange(newPosition);
   };
 
