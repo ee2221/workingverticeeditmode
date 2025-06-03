@@ -166,15 +166,23 @@ const EdgeLines = ({ geometry, object }) => {
       positions.getZ(i + 1)
     ).applyMatrix4(worldMatrix);
 
-    edges.push({ vertices: [i, i + 1], positions: [v1, v2] });
+    const midpoint = v1.clone().add(v2).multiplyScalar(0.5);
+    const direction = v2.clone().sub(v1).normalize();
+    const normal = new THREE.Vector3(-direction.y, direction.x, 0).normalize();
+
+    edges.push({
+      vertices: [i, i + 1],
+      positions: [v1, v2],
+      midpoint,
+      normal
+    });
   }
 
   return editMode === 'edge' ? (
     <group>
-      {edges.map(({ vertices: [v1, v2], positions: [p1, p2] }, i) => {
+      {edges.map(({ vertices: [v1, v2], positions: [p1, p2], midpoint, normal }, i) => {
         const points = [p1, p2];
         const geometry = new THREE.BufferGeometry().setFromPoints(points);
-        const midpoint = p1.clone().add(p2).multiplyScalar(0.5);
         
         return (
           <group key={i}>
@@ -186,16 +194,16 @@ const EdgeLines = ({ geometry, object }) => {
             </line>
             <mesh
               position={midpoint}
-              onDoubleClick={(e) => {
+              onClick={(e) => {
                 e.stopPropagation();
-                startEdgeDrag([v1, v2], [p1, p2]);
+                startEdgeDrag([v1, v2], [p1, p2], normal);
               }}
             >
-              <sphereGeometry args={[0.05]} />
+              <sphereGeometry args={[0.08]} />
               <meshBasicMaterial
                 color={selectedElements.edges.includes(i) ? 'red' : 'yellow'}
                 transparent
-                opacity={0.5}
+                opacity={0.7}
               />
             </mesh>
           </group>
@@ -251,7 +259,10 @@ const EditModeOverlay = () => {
           if (draggedVertex) {
             updateVertexDrag(localPosition);
           } else if (draggedEdge) {
-            updateEdgeDrag(localPosition);
+            const dragAmount = draggedEdge.normal.dot(
+              intersection.current.clone().sub(draggedEdge.positions[0])
+            );
+            updateEdgeDrag(dragAmount);
           }
         }
       }

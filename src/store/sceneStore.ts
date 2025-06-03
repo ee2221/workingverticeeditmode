@@ -27,6 +27,7 @@ interface SceneState {
     indices: number[][];
     positions: THREE.Vector3[];
     initialPositions: THREE.Vector3[];
+    normal: THREE.Vector3;
   } | null;
   addObject: (object: THREE.Object3D, name: string) => void;
   removeObject: (id: string) => void;
@@ -42,8 +43,8 @@ interface SceneState {
   startVertexDrag: (index: number, position: THREE.Vector3) => void;
   updateVertexDrag: (position: THREE.Vector3) => void;
   endVertexDrag: () => void;
-  startEdgeDrag: (vertexIndices: number[], positions: THREE.Vector3[]) => void;
-  updateEdgeDrag: (position: THREE.Vector3) => void;
+  startEdgeDrag: (vertexIndices: number[], positions: THREE.Vector3[], normal: THREE.Vector3) => void;
+  updateEdgeDrag: (dragAmount: number) => void;
   endEdgeDrag: () => void;
   updateCylinderVertices: (vertexCount: number) => void;
   updateSphereVertices: (vertexCount: number) => void;
@@ -201,83 +202,42 @@ export const useSceneStore = create<SceneState>((set, get) => ({
 
   endVertexDrag: () => set({ draggedVertex: null }),
 
-  startEdgeDrag: (vertexIndices, positions) =>
+  startEdgeDrag: (vertexIndices, positions, normal) =>
     set((state) => {
       if (!(state.selectedObject instanceof THREE.Mesh)) return state;
 
-      const geometry = state.selectedObject.geometry;
-      const positionAttribute = geometry.attributes.position;
-      const overlappingEdges = [];
-      const allPositions = [];
-      const initialPositions = [];
-      const processedVertices = new Set();
-
-      // Find all connected edges
-      const findConnectedEdges = (startIndex: number) => {
-        if (processedVertices.has(startIndex)) return;
-        processedVertices.add(startIndex);
-
-        const startPos = new THREE.Vector3(
-          positionAttribute.getX(startIndex),
-          positionAttribute.getY(startIndex),
-          positionAttribute.getZ(startIndex)
-        );
-
-        for (let i = 0; i < positionAttribute.count; i++) {
-          if (processedVertices.has(i)) continue;
-
-          const pos = new THREE.Vector3(
-            positionAttribute.getX(i),
-            positionAttribute.getY(i),
-            positionAttribute.getZ(i)
-          );
-
-          if (pos.distanceTo(startPos) < 0.0001) {
-            overlappingEdges.push([startIndex, i]);
-            allPositions.push(startPos.clone(), pos.clone());
-            initialPositions.push(startPos.clone(), pos.clone());
-            findConnectedEdges(i);
-          }
-        }
-      };
-
-      // Start the recursive search from each vertex in the selected edge
-      vertexIndices.forEach(index => findConnectedEdges(index));
-
       return {
         draggedEdge: {
-          indices: overlappingEdges,
-          positions: allPositions,
-          initialPositions: initialPositions
+          indices: [vertexIndices],
+          positions: positions,
+          initialPositions: positions.map(p => p.clone()),
+          normal: normal
         },
         selectedElements: {
           ...state.selectedElements,
-          edges: Array.from(processedVertices)
+          edges: vertexIndices
         }
       };
     }),
 
-  updateEdgeDrag: (position) =>
+  updateEdgeDrag: (dragAmount) =>
     set((state) => {
       if (!state.draggedEdge || !(state.selectedObject instanceof THREE.Mesh)) return state;
 
       const geometry = state.selectedObject.geometry;
       const positions = geometry.attributes.position;
-      const offset = position.clone().sub(state.draggedEdge.initialPositions[0]);
       
-      // Move all connected vertices together while maintaining edge shape
-      const processedVertices = new Set();
-      state.draggedEdge.indices.forEach(([v1, v2]) => {
-        if (!processedVertices.has(v1)) {
-          const newPos = state.draggedEdge.positions[0].clone().add(offset);
-          positions.setXYZ(v1, newPos.x, newPos.y, newPos.z);
-          processedVertices.add(v1);
-        }
-        if (!processedVertices.has(v2)) {
-          const newPos = state.draggedEdge.positions[1].clone().add(offset);
-          positions.setXYZ(v2, newPos.x, newPos.y, newPos.z);
-          processedVertices.add(v2);
-        }
+      state.draggedEdge.indices[0].forEach((vertexIndex, i) => {
+        const initialPos = state.draggedEdge.initialPositions[i].clone();
+        const offset = state.draggedEdge.normal.clone().multiplyScalar(dragAmount);
+        const newPos = initialPos.clone().add(offset);
+        
+        positions.setXYZ(
+          vertexIndex,
+          newPos.x,
+          newPos.y,
+          newPos.z
+        );
       });
 
       positions.needsUpdate = true;
