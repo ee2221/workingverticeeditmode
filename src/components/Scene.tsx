@@ -152,7 +152,6 @@ const EdgeLines = ({ geometry, object }) => {
   const edges = [];
   const worldMatrix = object.matrixWorld;
 
-  // Create edge pairs from vertices
   for (let i = 0; i < positions.count; i += 2) {
     const v1 = new THREE.Vector3(
       positions.getX(i),
@@ -167,20 +166,17 @@ const EdgeLines = ({ geometry, object }) => {
     ).applyMatrix4(worldMatrix);
 
     const midpoint = v1.clone().add(v2).multiplyScalar(0.5);
-    const direction = v2.clone().sub(v1).normalize();
-    const normal = new THREE.Vector3(-direction.y, direction.x, 0).normalize();
 
     edges.push({
       vertices: [i, i + 1],
       positions: [v1, v2],
-      midpoint,
-      normal
+      midpoint
     });
   }
 
   return editMode === 'edge' ? (
     <group>
-      {edges.map(({ vertices: [v1, v2], positions: [p1, p2], midpoint, normal }, i) => {
+      {edges.map(({ vertices: [v1, v2], positions: [p1, p2], midpoint }, i) => {
         const points = [p1, p2];
         const geometry = new THREE.BufferGeometry().setFromPoints(points);
         
@@ -196,7 +192,7 @@ const EdgeLines = ({ geometry, object }) => {
               position={midpoint}
               onClick={(e) => {
                 e.stopPropagation();
-                startEdgeDrag([v1, v2], [p1, p2], normal);
+                startEdgeDrag([v1, v2], [p1, p2]);
               }}
             >
               <sphereGeometry args={[0.08]} />
@@ -252,17 +248,10 @@ const EditModeOverlay = () => {
 
         raycaster.setFromCamera(pointer, camera);
         if (raycaster.ray.intersectPlane(plane.current, intersection.current)) {
-          const worldMatrix = selectedObject.matrixWorld;
-          const inverseMatrix = new THREE.Matrix4().copy(worldMatrix).invert();
-          const localPosition = intersection.current.clone().applyMatrix4(inverseMatrix);
-          
           if (draggedVertex) {
-            updateVertexDrag(localPosition);
+            updateVertexDrag(intersection.current);
           } else if (draggedEdge) {
-            const dragAmount = draggedEdge.normal.dot(
-              intersection.current.clone().sub(draggedEdge.positions[0])
-            );
-            updateEdgeDrag(dragAmount);
+            updateEdgeDrag(intersection.current);
           }
         }
       }

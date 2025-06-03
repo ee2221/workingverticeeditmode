@@ -27,7 +27,6 @@ interface SceneState {
     indices: number[][];
     positions: THREE.Vector3[];
     initialPositions: THREE.Vector3[];
-    normal: THREE.Vector3;
   } | null;
   addObject: (object: THREE.Object3D, name: string) => void;
   removeObject: (id: string) => void;
@@ -43,8 +42,8 @@ interface SceneState {
   startVertexDrag: (index: number, position: THREE.Vector3) => void;
   updateVertexDrag: (position: THREE.Vector3) => void;
   endVertexDrag: () => void;
-  startEdgeDrag: (vertexIndices: number[], positions: THREE.Vector3[], normal: THREE.Vector3) => void;
-  updateEdgeDrag: (dragAmount: number) => void;
+  startEdgeDrag: (vertexIndices: number[], positions: THREE.Vector3[]) => void;
+  updateEdgeDrag: (position: THREE.Vector3) => void;
   endEdgeDrag: () => void;
   updateCylinderVertices: (vertexCount: number) => void;
   updateSphereVertices: (vertexCount: number) => void;
@@ -202,16 +201,15 @@ export const useSceneStore = create<SceneState>((set, get) => ({
 
   endVertexDrag: () => set({ draggedVertex: null }),
 
-  startEdgeDrag: (vertexIndices, positions, normal) =>
+  startEdgeDrag: (vertexIndices, positions) =>
     set((state) => {
       if (!(state.selectedObject instanceof THREE.Mesh)) return state;
 
       return {
         draggedEdge: {
           indices: [vertexIndices],
-          positions: positions,
-          initialPositions: positions.map(p => p.clone()),
-          normal: normal
+          positions: positions.map(p => p.clone()),
+          initialPositions: positions.map(p => p.clone())
         },
         selectedElements: {
           ...state.selectedElements,
@@ -220,18 +218,19 @@ export const useSceneStore = create<SceneState>((set, get) => ({
       };
     }),
 
-  updateEdgeDrag: (dragAmount) =>
+  updateEdgeDrag: (position) =>
     set((state) => {
       if (!state.draggedEdge || !(state.selectedObject instanceof THREE.Mesh)) return state;
 
       const geometry = state.selectedObject.geometry;
       const positions = geometry.attributes.position;
       
+      // Calculate the movement offset from the initial position
+      const offset = position.clone().sub(state.draggedEdge.initialPositions[0]);
+      
+      // Update each vertex position of the edge
       state.draggedEdge.indices[0].forEach((vertexIndex, i) => {
-        const initialPos = state.draggedEdge.initialPositions[i].clone();
-        const offset = state.draggedEdge.normal.clone().multiplyScalar(dragAmount);
-        const newPos = initialPos.clone().add(offset);
-        
+        const newPos = state.draggedEdge.initialPositions[i].clone().add(offset);
         positions.setXYZ(
           vertexIndex,
           newPos.x,
