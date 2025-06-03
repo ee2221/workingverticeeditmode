@@ -14,38 +14,21 @@ const VertexCoordinates = ({ position, onPositionChange }) => {
   };
 
   return (
-    <div className="absolute right-4 bottom-4 bg-black/75 text-white p-4 rounded-lg font-mono">
+    <div className="absolute right-4 bottom-4 bg-[#1a1a1a] rounded-xl shadow-2xl shadow-black/20 p-4 border border-white/5">
+      <h3 className="text-sm font-medium mb-3 text-white/70">Vertex Position</h3>
       <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <label className="w-8">X:</label>
-          <input
-            type="number"
-            value={position.x.toFixed(3)}
-            onChange={(e) => handleChange('x', e.target.value)}
-            className="bg-gray-800 px-2 py-1 rounded w-24 text-right"
-            step="0.1"
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <label className="w-8">Y:</label>
-          <input
-            type="number"
-            value={position.y.toFixed(3)}
-            onChange={(e) => handleChange('y', e.target.value)}
-            className="bg-gray-800 px-2 py-1 rounded w-24 text-right"
-            step="0.1"
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <label className="w-8">Z:</label>
-          <input
-            type="number"
-            value={position.z.toFixed(3)}
-            onChange={(e) => handleChange('z', e.target.value)}
-            className="bg-gray-800 px-2 py-1 rounded w-24 text-right"
-            step="0.1"
-          />
-        </div>
+        {(['x', 'y', 'z'] as const).map((axis) => (
+          <div key={axis} className="flex items-center gap-2">
+            <label className="text-xs text-white/50 uppercase w-6">{axis}:</label>
+            <input
+              type="number"
+              value={position[axis].toFixed(3)}
+              onChange={(e) => handleChange(axis, e.target.value)}
+              className="bg-[#2a2a2a] border border-white/10 rounded px-2 py-1 w-24 text-right text-sm text-white/90 focus:outline-none focus:border-blue-500/50"
+              step="0.1"
+            />
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -89,11 +72,11 @@ const VertexCountSelector = () => {
   }
 
   return (
-    <div className="absolute left-1/2 top-4 -translate-x-1/2 bg-black/75 text-white p-4 rounded-lg">
+    <div className="absolute left-1/2 top-4 -translate-x-1/2 bg-[#1a1a1a] rounded-xl shadow-2xl shadow-black/20 p-4 border border-white/5">
       <div className="flex items-center gap-2">
-        <label className="text-sm font-medium">Vertex Count:</label>
+        <label className="text-sm font-medium text-white/70">Vertex Count:</label>
         <select
-          className="bg-gray-800 px-3 py-1.5 rounded text-sm"
+          className="bg-[#2a2a2a] border border-white/10 px-3 py-1.5 rounded text-sm text-white/90"
           onChange={(e) => onChange(parseInt(e.target.value))}
           value={currentVertexCount}
         >
