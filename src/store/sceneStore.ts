@@ -28,7 +28,9 @@ interface SceneState {
     positions: THREE.Vector3[];
     initialPositions: THREE.Vector3[];
     connectedVertices: Set<number>;
+    midpoint: THREE.Vector3;
   } | null;
+  isDraggingEdge: boolean;
   addObject: (object: THREE.Object3D, name: string) => void;
   removeObject: (id: string) => void;
   setSelectedObject: (object: THREE.Object3D | null) => void;
@@ -43,9 +45,10 @@ interface SceneState {
   startVertexDrag: (index: number, position: THREE.Vector3) => void;
   updateVertexDrag: (position: THREE.Vector3) => void;
   endVertexDrag: () => void;
-  startEdgeDrag: (vertexIndices: number[], positions: THREE.Vector3[]) => void;
+  startEdgeDrag: (vertexIndices: number[], positions: THREE.Vector3[], midpoint: THREE.Vector3) => void;
   updateEdgeDrag: (position: THREE.Vector3) => void;
   endEdgeDrag: () => void;
+  setIsDraggingEdge: (isDragging: boolean) => void;
   updateCylinderVertices: (vertexCount: number) => void;
   updateSphereVertices: (vertexCount: number) => void;
 }
@@ -62,6 +65,7 @@ export const useSceneStore = create<SceneState>((set, get) => ({
   },
   draggedVertex: null,
   draggedEdge: null,
+  isDraggingEdge: false,
 
   addObject: (object, name) =>
     set((state) => ({
@@ -202,7 +206,7 @@ export const useSceneStore = create<SceneState>((set, get) => ({
 
   endVertexDrag: () => set({ draggedVertex: null }),
 
-  startEdgeDrag: (vertexIndices, positions) =>
+  startEdgeDrag: (vertexIndices, positions, midpoint) =>
     set((state) => {
       if (!(state.selectedObject instanceof THREE.Mesh)) return state;
 
@@ -211,19 +215,17 @@ export const useSceneStore = create<SceneState>((set, get) => ({
       const connectedVertices = new Set<number>();
       const edges: number[][] = [];
 
-      // Find all connected vertices
-      const findConnectedVertices = (startIndex: number) => {
-        if (connectedVertices.has(startIndex)) return;
-        connectedVertices.add(startIndex);
-
-        const startPos = new THREE.Vector3(
-          positionAttribute.getX(startIndex),
-          positionAttribute.getY(startIndex),
-          positionAttribute.getZ(startIndex)
+      // Find all overlapping vertices for each vertex in the edge
+      const findOverlappingVertices = (targetIndex: number) => {
+        const targetPos = new THREE.Vector3(
+          positionAttribute.getX(targetIndex),
+          positionAttribute.getY(targetIndex),
+          positionAttribute.getZ(targetIndex)
         );
 
+        const overlapping = [targetIndex];
         for (let i = 0; i < positionAttribute.count; i++) {
-          if (i === startIndex) continue;
+          if (i === targetIndex) continue;
 
           const pos = new THREE.Vector3(
             positionAttribute.getX(i),
@@ -231,21 +233,35 @@ export const useSceneStore = create<SceneState>((set, get) => ({
             positionAttribute.getZ(i)
           );
 
-          if (pos.distanceTo(startPos) < 0.0001) {
-            edges.push([startIndex, i]);
-            findConnectedVertices(i);
+          if (pos.distanceTo(targetPos) < 0.0001) {
+            overlapping.push(i);
           }
         }
+        return overlapping;
       };
 
-      vertexIndices.forEach(index => findConnectedVertices(index));
+      // Get all overlapping vertices for both edge vertices
+      const vertex1Overlapping = findOverlappingVertices(vertexIndices[0]);
+      const vertex2Overlapping = findOverlappingVertices(vertexIndices[1]);
+
+      // Add all overlapping vertices to connected set
+      vertex1Overlapping.forEach(v => connectedVertices.add(v));
+      vertex2Overlapping.forEach(v => connectedVertices.add(v));
+
+      // Create edge pairs
+      vertex1Overlapping.forEach(v1 => {
+        vertex2Overlapping.forEach(v2 => {
+          edges.push([v1, v2]);
+        });
+      });
 
       return {
         draggedEdge: {
           indices: edges,
           positions: positions,
           initialPositions: positions.map(p => p.clone()),
-          connectedVertices
+          connectedVertices,
+          midpoint: midpoint.clone()
         },
         selectedElements: {
           ...state.selectedElements,
@@ -260,9 +276,9 @@ export const useSceneStore = create<SceneState>((set, get) => ({
 
       const geometry = state.selectedObject.geometry;
       const positions = geometry.attributes.position;
-      const offset = position.clone().sub(state.draggedEdge.initialPositions[0]);
+      const offset = position.clone().sub(state.draggedEdge.midpoint);
 
-      // Move all connected vertices together
+      // Move all connected vertices by the offset
       state.draggedEdge.connectedVertices.forEach(vertexIndex => {
         const currentPos = new THREE.Vector3(
           positions.getX(vertexIndex),
@@ -279,12 +295,14 @@ export const useSceneStore = create<SceneState>((set, get) => ({
       return {
         draggedEdge: {
           ...state.draggedEdge,
-          initialPositions: [position.clone()]
+          midpoint: position.clone()
         }
       };
     }),
 
   endEdgeDrag: () => set({ draggedEdge: null }),
+
+  setIsDraggingEdge: (isDragging) => set({ isDraggingEdge: isDragging }),
 
   updateCylinderVertices: (vertexCount) =>
     set((state) => {

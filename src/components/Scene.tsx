@@ -147,10 +147,13 @@ const VertexPoints = ({ geometry, object }) => {
 };
 
 const EdgeLines = ({ geometry, object }) => {
-  const { editMode, selectedElements, startEdgeDrag, draggedEdge } = useSceneStore();
+  const { editMode, draggedEdge, startEdgeDrag, isDraggingEdge, setIsDraggingEdge } = useSceneStore();
+  const { camera, raycaster, pointer } = useThree();
   const positions = geometry.attributes.position;
   const edges = [];
   const worldMatrix = object.matrixWorld;
+  const plane = useRef(new THREE.Plane());
+  const intersection = useRef(new THREE.Vector3());
 
   // Get all edges including vertical ones
   const indices = geometry.index ? Array.from(geometry.index.array) : null;
@@ -217,6 +220,35 @@ const EdgeLines = ({ geometry, object }) => {
     }
   }
 
+  useEffect(() => {
+    if (!isDraggingEdge || !draggedEdge) return;
+
+    const handlePointerMove = (event) => {
+      // Set up a plane perpendicular to camera for dragging
+      const cameraDirection = new THREE.Vector3();
+      camera.getWorldDirection(cameraDirection);
+      plane.current.setFromNormalAndCoplanarPoint(cameraDirection, draggedEdge.midpoint);
+
+      raycaster.setFromCamera(pointer, camera);
+      if (raycaster.ray.intersectPlane(plane.current, intersection.current)) {
+        useSceneStore.getState().updateEdgeDrag(intersection.current);
+      }
+    };
+
+    const handlePointerUp = () => {
+      setIsDraggingEdge(false);
+      useSceneStore.getState().endEdgeDrag();
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+  }, [isDraggingEdge, draggedEdge, camera, raycaster, pointer, setIsDraggingEdge]);
+
   return editMode === 'edge' ? (
     <group>
       {edges.map(({ vertices: [v1, v2], positions: [p1, p2], midpoint }, i) => {
@@ -236,9 +268,10 @@ const EdgeLines = ({ geometry, object }) => {
             </line>
             <mesh
               position={midpoint}
-              onClick={(e) => {
+              onPointerDown={(e) => {
                 e.stopPropagation();
-                startEdgeDrag([v1, v2], [p1, p2]);
+                setIsDraggingEdge(true);
+                startEdgeDrag([v1, v2], [p1, p2], midpoint);
               }}
             >
               <sphereGeometry args={[0.08]} />
@@ -256,18 +289,15 @@ const EdgeLines = ({ geometry, object }) => {
 };
 
 const EditModeOverlay = () => {
-  const { scene, camera, raycaster, pointer } = useThree();
   const { 
     selectedObject, 
     editMode,
     setSelectedElements,
     draggedVertex,
-    draggedEdge,
     updateVertexDrag,
-    updateEdgeDrag,
-    endVertexDrag,
-    endEdgeDrag
+    endVertexDrag
   } = useSceneStore();
+  const { scene, camera, raycaster, pointer } = useThree();
   const plane = useRef(new THREE.Plane());
   const intersection = useRef(new THREE.Vector3());
 
@@ -275,30 +305,18 @@ const EditModeOverlay = () => {
     if (!selectedObject || !editMode || !(selectedObject instanceof THREE.Mesh)) return;
 
     const handlePointerMove = (event) => {
-      if (draggedVertex || draggedEdge) {
+      if (draggedVertex) {
         const cameraDirection = new THREE.Vector3();
         camera.getWorldDirection(cameraDirection);
         plane.current.normal.copy(cameraDirection);
-        
-        if (draggedVertex) {
-          plane.current.setFromNormalAndCoplanarPoint(
-            cameraDirection,
-            draggedVertex.position
-          );
-        } else if (draggedEdge) {
-          plane.current.setFromNormalAndCoplanarPoint(
-            cameraDirection,
-            draggedEdge.positions[0]
-          );
-        }
+        plane.current.setFromNormalAndCoplanarPoint(
+          cameraDirection,
+          draggedVertex.position
+        );
 
         raycaster.setFromCamera(pointer, camera);
         if (raycaster.ray.intersectPlane(plane.current, intersection.current)) {
-          if (draggedVertex) {
-            updateVertexDrag(intersection.current);
-          } else if (draggedEdge) {
-            updateEdgeDrag(intersection.current);
-          }
+          updateVertexDrag(intersection.current);
         }
       }
     };
@@ -306,9 +324,6 @@ const EditModeOverlay = () => {
     const handlePointerUp = () => {
       if (draggedVertex) {
         endVertexDrag();
-      }
-      if (draggedEdge) {
-        endEdgeDrag();
       }
     };
 
@@ -327,11 +342,8 @@ const EditModeOverlay = () => {
     pointer,
     setSelectedElements,
     draggedVertex,
-    draggedEdge,
     updateVertexDrag,
-    updateEdgeDrag,
-    endVertexDrag,
-    endEdgeDrag
+    endVertexDrag
   ]);
 
   if (!selectedObject || !editMode || !(selectedObject instanceof THREE.Mesh)) return null;
