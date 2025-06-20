@@ -147,13 +147,15 @@ const VertexPoints = ({ geometry, object }) => {
 };
 
 const EdgeLines = ({ geometry, object }) => {
-  const { editMode, draggedEdge, startEdgeDrag, isDraggingEdge, setIsDraggingEdge } = useSceneStore();
+  const { editMode, draggedEdge, startEdgeDrag, isDraggingEdge, setIsDraggingEdge, endEdgeDrag } = useSceneStore();
   const { camera, raycaster, pointer } = useThree();
   const positions = geometry.attributes.position;
   const edges = [];
   const worldMatrix = object.matrixWorld;
   const plane = useRef(new THREE.Plane());
   const intersection = useRef(new THREE.Vector3());
+  const [clickCount, setClickCount] = useState(0);
+  const [clickTimer, setClickTimer] = useState<NodeJS.Timeout | null>(null);
 
   // Get all edges including vertical ones
   const indices = geometry.index ? Array.from(geometry.index.array) : null;
@@ -235,19 +237,45 @@ const EdgeLines = ({ geometry, object }) => {
       }
     };
 
-    const handlePointerUp = () => {
-      setIsDraggingEdge(false);
-      useSceneStore.getState().endEdgeDrag();
+    const handleRightClick = (event) => {
+      if (event.button === 2) { // Right click
+        event.preventDefault();
+        setIsDraggingEdge(false);
+        endEdgeDrag();
+      }
     };
 
     window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('contextmenu', handleRightClick);
+    window.addEventListener('mousedown', handleRightClick);
     
     return () => {
       window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('contextmenu', handleRightClick);
+      window.removeEventListener('mousedown', handleRightClick);
     };
-  }, [isDraggingEdge, draggedEdge, camera, raycaster, pointer, setIsDraggingEdge]);
+  }, [isDraggingEdge, draggedEdge, camera, raycaster, pointer, setIsDraggingEdge, endEdgeDrag]);
+
+  const handleEdgeClick = (vertices: [number, number], positions: [THREE.Vector3, THREE.Vector3], midpoint: THREE.Vector3) => {
+    if (isDraggingEdge) return;
+
+    setClickCount(prev => prev + 1);
+
+    if (clickTimer) {
+      clearTimeout(clickTimer);
+    }
+
+    const timer = setTimeout(() => {
+      if (clickCount + 1 >= 2) {
+        // Double click detected - start dragging
+        setIsDraggingEdge(true);
+        startEdgeDrag(vertices, positions, midpoint);
+      }
+      setClickCount(0);
+    }, 300);
+
+    setClickTimer(timer);
+  };
 
   return editMode === 'edge' ? (
     <group>
@@ -270,8 +298,7 @@ const EdgeLines = ({ geometry, object }) => {
               position={midpoint}
               onPointerDown={(e) => {
                 e.stopPropagation();
-                setIsDraggingEdge(true);
-                startEdgeDrag([v1, v2], [p1, p2], midpoint);
+                handleEdgeClick([v1, v2], [p1, p2], midpoint);
               }}
             >
               <sphereGeometry args={[0.08]} />
@@ -394,6 +421,7 @@ const Scene: React.FC = () => {
       <Canvas
         camera={{ position: [5, 5, 5], fov: 75 }}
         className="w-full h-full bg-gray-900"
+        onContextMenu={(e) => e.preventDefault()} // Prevent default right-click menu
       >
         <ambientLight intensity={0.5} />
         <directionalLight position={[10, 10, 5]} intensity={1} />
